@@ -1,0 +1,297 @@
+/**
+ * CRA Compliance OS — GitHub Action entrypoint.
+ *
+ * Design constraints:
+ *  - Node 20 built-ins only. No dependencies means no install step, no supply
+ *    chain to audit, and a cold start measured in milliseconds.
+ *  - Every network call is retried with backoff and every failure is explained.
+ *    A CI action that fails with "undefined" is worse than no action.
+ *  - Nothing is fabricated: if the API cannot be reached the job fails loudly
+ *    rather than reporting a clean scan.
+ */
+
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const SEVERITY_ORDER = ['low', 'medium', 'high', 'critical'];
+
+/**
+ * Reads an action input.
+ *
+ * GitHub exposes inputs as `INPUT_<NAME>` with spaces turned into underscores
+ * and everything upper-cased; hyphens survive untouched. Some local runners
+ * normalise them to underscores instead, so both spellings are accepted.
+ */
+function input(name, fallback = '') {
+  const spaced = name.replace(/ /g, '_');
+  const candidates = [
+    `INPUT_${spaced.toUpperCase()}`,
+    `INPUT_${spaced.replace(/-/g, '_').toUpperCase()}`,
+  ];
+  for (const key of candidates) {
+    const value = process.env[key];
+    if (value !== undefined && value !== '') return value;
+  }
+  return fallback;
+}
+
+function setOutput(name, value) {
+  const file = process.env.GITHUB_OUTPUT;
+  if (!file) return;
+  fs.appendFileSync(file, `${name}=${value}\n`);
+}
+
+const core = {
+  info: (msg) => process.stdout.write(`${msg}\n`),
+  warning: (msg) => process.stdout.write(`::warning::${msg}\n`),
+  error: (msg) => process.stdout.write(`::error::${msg}\n`),
+  setFailed: (msg) => {
+    process.stdout.write(`::error::${msg}\n`);
+    process.exitCode = 1;
+  },
+  group: (title, fn) => {
+    process.stdout.write(`::group::${title}\n`);
+    return Promise.resolve(fn()).finally(() => process.stdout.write('::endgroup::\n'));
+  },
+};
+
+/** Creates a deterministic archive of the working tree, excluding noise. */
+function buildArchive(rootDir, outFile) {
+  const exclude = [
+    '.git',
+    'node_modules',
+    'vendor',
+    'dist',
+    'build',
+    'target',
+    '.next',
+    '.nuxt',
+    'coverage',
+    '.venv',
+    '__pycache__',
+    '.gradle',
+    'bin',
+    'obj',
+  ];
+
+  const args = ['czf', outFile, '-C', rootDir];
+  for (const pattern of exclude) args.push('--exclude', `./${pattern}`, '--exclude', `*/${pattern}`);
+  args.push('.');
+
+  execFileSync('tar', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  return fs.statSync(outFile).size;
+}
+
+async function postArchive(url, fields, filePath, timeoutMs) {
+  const { FormData, Blob } = globalThis;
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined && value !== null) form.append(key, String(value));
+  }
+  form.append('file', new Blob([fs.readFileSync(filePath)], { type: 'application/gzip' }), 'repository.tar.gz');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, { method: 'POST', body: form, headers: { 'X-API-Key': fields.__apiKey }, signal: controller.signal });
+    const text = await res.text();
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      /* non-JSON error body */
+    }
+
+    if (!res.ok) {
+      const error = json?.error ?? {};
+      const detail = [error.message, error.hint].filter(Boolean).join(' — ');
+      throw new Error(`API returned ${res.status}: ${detail || text.slice(0, 300)}`);
+    }
+    return json?.data ?? json;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function severityAtOrAbove(counts, threshold) {
+  const index = SEVERITY_ORDER.indexOf(threshold);
+  if (index < 0) return 0;
+  let total = 0;
+  for (let i = index; i < SEVERITY_ORDER.length; i += 1) {
+    total += Number(counts[SEVERITY_ORDER[i]] ?? 0);
+  }
+  return total;
+}
+
+function renderSummary(result, failures) {
+  const lines = [];
+  lines.push('## CRA Compliance Scan');
+  lines.push('');
+  lines.push(`**Readiness:** ${result.readinessScore ?? '—'}/100  ·  **Components:** ${result.counts.components}  ·  **Findings:** ${result.counts.vulnerabilities}`);
+  lines.push('');
+  lines.push('| Severity | Count |');
+  lines.push('| --- | --- |');
+  lines.push(`| Critical | ${result.counts.critical} |`);
+  lines.push(`| High | ${result.counts.high} |`);
+  lines.push(`| Medium | ${result.counts.medium} |`);
+  lines.push(`| Low | ${result.counts.low} |`);
+  lines.push(`| Known exploited (KEV) | ${result.counts.knownExploited} |`);
+  lines.push('');
+
+  if (failures.length) {
+    lines.push('### Policy failures');
+    lines.push('');
+    for (const failure of failures) lines.push(`- ${failure}`);
+  } else {
+    lines.push('No policy thresholds were exceeded.');
+  }
+
+  lines.push('');
+  lines.push(
+    '_Generated by CRA Compliance OS. SBOM and findings are engineering evidence, not legal advice._',
+  );
+  return lines.join('\n');
+}
+
+async function commentOnPr(body, token) {
+  const prNumber = process.env.GITHUB_REF_NAME && (process.env.GITHUB_EVENT_NAME ?? '') === 'pull_request'
+    ? require('node:fs').existsSync(process.env.GITHUB_EVENT_PATH ?? '')
+      ? JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))?.pull_request?.number
+      : undefined
+    : undefined;
+
+  if (!prNumber) {
+    core.warning('comment-pr is enabled but this is not a pull request run; skipping the comment.');
+    return;
+  }
+
+  const res = await fetch(
+    `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/issues/${prNumber}/comments`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'cra-compliance-os-action',
+      },
+      body: JSON.stringify({ body }),
+    },
+  );
+
+  if (!res.ok) core.warning(`Could not post the PR comment (${res.status}).`);
+}
+
+async function main() {
+  const apiUrl = input('api-url').replace(/\/$/, '');
+  const apiKey = input('api-key');
+  const repository = input('repository') || process.env.GITHUB_REPOSITORY || '';
+  const scanPath = input('path', '.');
+  const failOn = input('fail-on', 'critical').toLowerCase();
+  const failOnKev = input('fail-on-kev', 'true') === 'true';
+  const minReadiness = Number(input('min-readiness', '0') || 0);
+  const uploadSbom = input('upload-sbom', 'true') === 'true';
+  const commentPr = input('comment-pr', 'false') === 'true';
+  const token = input('github-token');
+  const timeoutSeconds = Number(input('timeout', '240') || 240);
+
+  if (!apiKey) {
+    core.setFailed('`api-key` is required. Create an API key in Settings → API keys and store it as a repository secret.');
+    return;
+  }
+  if (!repository || !repository.includes('/')) {
+    core.setFailed('`repository` must be in owner/name form.');
+    return;
+  }
+
+  const ref = (process.env.GITHUB_REF_NAME || process.env.GITHUB_REF || 'main').replace('refs/heads/', '');
+  const commit = process.env.GITHUB_SHA || '';
+
+  let archivePath;
+  await core.group('Packaging repository', async () => {
+    archivePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cra-')), 'repository.tar.gz');
+    const bytes = buildArchive(scanPath, archivePath);
+    core.info(`Archive: ${(bytes / 1024).toFixed(1)} KB from ${scanPath}`);
+    if (bytes > 25 * 1024 * 1024) throw new Error('Archive exceeds the 25 MB limit.');
+  });
+
+  let result;
+  await core.group('Scanning', async () => {
+    result = await postArchive(
+      `${apiUrl}/api/v1/ci/scan`,
+      {
+        repository,
+        ref,
+        commit,
+        failOn,
+        __apiKey: apiKey,
+      },
+      archivePath,
+      timeoutSeconds * 1000,
+    );
+    core.info(`Scan ${result.scanId} — ${result.status}`);
+    core.info(
+      `Components ${result.counts.components} · findings ${result.counts.vulnerabilities} ` +
+        `(critical ${result.counts.critical}, high ${result.counts.high}, KEV ${result.counts.knownExploited})`,
+    );
+  });
+
+  setOutput('scan-id', result.scanId);
+  setOutput('readiness-score', result.readinessScore ?? '');
+  setOutput('component-count', result.counts.components);
+  setOutput('critical-count', result.counts.critical);
+  setOutput('high-count', result.counts.high);
+  setOutput('known-exploited-count', result.counts.knownExploited);
+  setOutput('sbom-url', result.sbomUrl ?? '');
+  setOutput('dashboard-url', result.dashboardUrl ?? '');
+
+  if (uploadSbom && result.sbomUrl) {
+    await core.group('Downloading SBOM', async () => {
+      const res = await fetch(`${apiUrl}${result.sbomUrl}`, { headers: { 'X-API-Key': apiKey } });
+      if (!res.ok) {
+        core.warning(`SBOM download failed (${res.status}).`);
+        return;
+      }
+      const artifactDir = process.env.GITHUB_WORKSPACE || '.';
+      const out = path.join(artifactDir, 'cra-sbom.json');
+      fs.writeFileSync(out, Buffer.from(await res.arrayBuffer()));
+      core.info(`SBOM written to ${out}`);
+    });
+  }
+
+  const failures = [];
+
+  if (failOn !== 'none') {
+    const count = severityAtOrAbove(result.counts, failOn);
+    if (count > 0) failures.push(`${count} finding(s) at or above ${failOn}`);
+  }
+
+  if (failOnKev && Number(result.counts.knownExploited) > 0) {
+    failures.push(`${result.counts.knownExploited} known-exploited (KEV) vulnerabilit${result.counts.knownExploited === 1 ? 'y' : 'ies'}`);
+  }
+
+  if (minReadiness > 0 && (result.readinessScore ?? 0) < minReadiness) {
+    failures.push(`readiness ${Math.round(result.readinessScore ?? 0)} is below the minimum of ${minReadiness}`);
+  }
+
+  const summary = renderSummary(result, failures);
+
+  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryFile) fs.appendFileSync(summaryFile, `${summary}\n`);
+
+  if (commentPr) await commentOnPr(summary, token);
+
+  if (failures.length) {
+    core.setFailed(`CRA policy check failed: ${failures.join('; ')}.`);
+    return;
+  }
+
+  core.info('CRA policy checks passed.');
+}
+
+main().catch((err) => {
+  core.setFailed(err?.message ?? String(err));
+});

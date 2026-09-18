@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://cracompliance.dev/</loc><priority>1.0</priority></url>
+  <url><loc>https://cracompliance.dev/pricing</loc><priority>0.9</priority></url>
+  <url><loc>https://cracompliance.dev/guides</loc><priority>0.7</priority></url>
+  <url><loc>https://cracompliance.dev/guides/cyber-resilience-act-for-software-teams</loc><priority>0.8</priority></url>
+  <url><loc>https://cracompliance.dev/guides/cra-readiness-checklist</loc><priority>0.8</priority></url>
+  <url><loc>https://cracompliance.dev/guides/cra-sbom-requirements</loc><priority>0.8</priority></url>
+  <url><loc>https://cracompliance.dev/guides/article-14-reporting</loc><priority>0.8</priority></url>
+  <url><loc>https://cracompliance.dev/legal/security</loc><priority>0.5</priority></url>
+  <url><loc>https://cracompliance.dev/legal/privacy</loc><priority>0.4</priority></url>
+  <url><loc>https://cracompliance.dev/legal/terms</loc><priority>0.4</priority></url>
+</urlset>

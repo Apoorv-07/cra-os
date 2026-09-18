@@ -1,0 +1,63 @@
+name: Deploy
+
+# Template deployment to a single host over SSH.
+#
+# Required repository secrets:
+#   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_PATH (/opt/cra)
+# Host-side prerequisites: Docker + Compose, and /opt/cra/.env with the real
+# secrets (never committed — .env is git-ignored and CI never reads it).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: production
+        type: choice
+        options: [staging, production]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+      - name: Copy build to the host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: 'apps,drizzle,package.json,package-lock.json,infra/docker'
+          target: ${{ secrets.DEPLOY_PATH }}
+          strip_components: 0
+
+      - name: Restart services
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+            # Migrations also run at API boot; run them here first so a failure
+            # stops the deploy before traffic moves to the new image.
+            docker compose -f infra/docker/docker-compose.yml run --rm --no-deps \
+              --entrypoint "node dist/db/migrate.js" api
+            docker compose -f infra/docker/docker-compose.yml up -d --build
+            docker image prune -f

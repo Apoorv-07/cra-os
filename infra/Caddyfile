@@ -1,0 +1,26 @@
+# Reverse proxy for a single-node deployment.
+#
+# Caddy terminates TLS and renews certificates automatically. Point DNS at the
+# host, then: caddy run --config infra/Caddyfile
+
+cra.example.com {
+	encode zstd gzip
+
+	# Static, hashed frontend assets: cache hard.
+	@immutable path /assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:8787
+
+	log {
+		output stdout
+		format json
+	}
+}

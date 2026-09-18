@@ -1,0 +1,71 @@
+# Two processes, one volume, one image.
+#
+#   cd infra/docker
+#   SESSION_SECRET=$(openssl rand -hex 32) ENCRYPTION_KEY=$(openssl rand -hex 32) \
+#     docker compose up -d
+#
+# The API serves the built frontend, so only one port is published.
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '8787:8787'
+    environment:
+      NODE_ENV: production
+      APP_URL: ${APP_URL:-http://localhost:8787}
+      WEB_URL: ${WEB_URL:-http://localhost:8787}
+      SESSION_SECRET: ${SESSION_SECRET:?generate with openssl rand -hex 32}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?generate with openssl rand -hex 32}
+      DATABASE_PATH: /app/data/cra.db
+      STORAGE_DIR: /app/data/storage
+      RUN_WORKER_IN_PROCESS: 'false'
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-manual}
+      DODO_API_KEY: ${DODO_API_KEY:-}
+      DODO_WEBHOOK_SECRET: ${DODO_WEBHOOK_SECRET:-}
+      DODO_ENV: ${DODO_ENV:-test}
+      MAIL_DRIVER: ${MAIL_DRIVER:-none}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-CRA Compliance OS <no-reply@example.com>}
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_APP_WEBHOOK_SECRET: ${GITHUB_APP_WEBHOOK_SECRET:-}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      TRUST_PROXY: 'true'
+    volumes:
+      - cra-data:/app/data
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "fetch(\'http://127.0.0.1:8787/health\').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    command: ['node', 'dist/worker-entry.js']
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /app/data/cra.db
+      STORAGE_DIR: /app/data/storage
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?generate with openssl rand -hex 32}
+      SESSION_SECRET: ${SESSION_SECRET:?generate with openssl rand -hex 32}
+      WORKER_POLL_MS: '1500'
+      WORKER_CONCURRENCY: '3'
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+    volumes:
+      - cra-data:/app/data
+
+volumes:
+  cra-data:

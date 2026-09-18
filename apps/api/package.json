@@ -1,0 +1,44 @@
+{
+  "name": "@cra/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "worker": "tsx watch src/worker-entry.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "NODE_ENV=production node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "test": "vitest run --config vitest.config.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:reset": "rm -f data/*.db data/*.db-shm data/*.db-wal && tsx src/db/migrate.ts && tsx src/db/seed.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "better-sqlite3": "^12.11.1",
+    "drizzle-orm": "^0.45.2",
+    "fast-xml-parser": "^5.11.1",
+    "hono": "^4.13.7",
+    "nanoid": "^5.1.16",
+    "smol-toml": "^1.8.0",
+    "tar-stream": "^3.2.1",
+    "zod": "^4.6.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.5.1",
+    "@types/tar-stream": "^3.1.4",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^10.10.0",
+    "tsx": "^4.23.13",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^4.1.11"
+  }
+}

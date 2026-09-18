@@ -1,0 +1,53 @@
+# ---------------------------------------------------------------------------
+# PLANNED configuration for the Cloudflare Workers deployment.
+#
+# NOT IN USE. The production deployment is the Node process documented in
+# docs/DEPLOYMENT.md. See ./README.md for what must change before this file is
+# live. Committed so the target bindings are decided once rather than invented
+# under time pressure.
+# ---------------------------------------------------------------------------
+
+name = "cra-compliance-os"
+main = "src/worker.ts"
+compatibility_date = "2026-01-01"
+
+[assets]
+directory = "../apps/web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# --- Durable objects / bindings ---------------------------------------------
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cra-compliance-os"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "cra-artifacts"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# --- Queues -----------------------------------------------------------------
+
+[[queues.producers]]
+binding = "JOBS"
+queue = "cra-jobs"
+
+[[queues.consumers]]
+queue = "cra-jobs"
+max_batch_size = 1
+max_retries = 5
+
+# --- Scheduled work (KEV sync, credit expiry) -------------------------------
+
+[triggers]
+crons = ["0 3 * * *", "0 * * * *"]
+
+# --- Observability ----------------------------------------------------------
+
+[observability]
+enabled = true

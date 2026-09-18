@@ -1,0 +1,66 @@
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  { ignores: ['dist/**', 'node_modules/**', 'vite.config.ts', 'vitest.config.ts'] },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      parserOptions: { ecmaFeatures: { jsx: true } },
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        localStorage: 'readonly',
+        sessionStorage: 'readonly',
+        location: 'readonly',
+        history: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        requestAnimationFrame: 'readonly',
+        cancelAnimationFrame: 'readonly',
+        matchMedia: 'readonly',
+        IntersectionObserver: 'readonly',
+        ResizeObserver: 'readonly',
+        MutationObserver: 'readonly',
+        console: 'readonly',
+        URL: 'readonly',
+        FormData: 'readonly',
+        HTMLElement: 'readonly',
+        Element: 'readonly',
+        Node: 'readonly',
+        Event: 'readonly',
+        KeyboardEvent: 'readonly',
+        MouseEvent: 'readonly',
+        CustomEvent: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/no-unused-expressions': ['error', { allowShortCircuit: true, allowTernary: true }],
+      'no-unused-vars': 'off',
+      'react/jsx-no-undef': 'off',
+      eqeqeq: ['error', 'smart'],
+      'prefer-const': 'error',
+      'no-console': 'off',
+    },
+  },
+  {
+    files: ['src/__tests__/**/*.tsx', 'src/__tests__/**/*.ts', 'src/test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
+);

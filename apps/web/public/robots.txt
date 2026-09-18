@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Allow: /pricing
+Allow: /guides/
+Allow: /legal/
+Disallow: /app
+Disallow: /api/
+Disallow: /share/

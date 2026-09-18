@@ -1,0 +1,28 @@
+{
+  "name": "cra-compliance-os",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRA Compliance OS - continuous EU Cyber Resilience Act compliance for software products",
+  "engines": { "node": ">=20.10.0" },
+  "workspaces": ["apps/api", "apps/web"],
+  "scripts": {
+    "dev": "concurrently -n api,worker,web -c cyan,yellow,magenta \"npm:dev:api\" \"npm:dev:worker\" \"npm:dev:web\"",
+    "dev:api": "npm -w @cra/api run dev",
+    "dev:web": "npm -w @cra/web run dev",
+    "dev:worker": "npm -w @cra/api run worker",
+    "build": "npm -w @cra/web run build && npm -w @cra/api run build",
+    "start": "npm -w @cra/api run start",
+    "typecheck": "npm -w @cra/api run typecheck && npm -w @cra/web run typecheck",
+    "lint": "npm -w @cra/api run lint && npm -w @cra/web run lint",
+    "test": "npm -w @cra/api run test",
+    "test:e2e": "npm -w @cra/api run test:e2e",
+    "db:generate": "npm -w @cra/api run db:generate",
+    "db:migrate": "npm -w @cra/api run db:migrate",
+    "db:seed": "npm -w @cra/api run db:seed",
+    "db:reset": "npm -w @cra/api run db:reset"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  }
+}

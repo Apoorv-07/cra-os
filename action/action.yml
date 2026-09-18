@@ -1,0 +1,77 @@
+name: 'CRA Compliance Scan'
+description: >-
+  Scan a repository for EU Cyber Resilience Act readiness: generate a CycloneDX
+  SBOM, match dependencies against OSV, KEV and EPSS, score readiness, and fail
+  the build on severity thresholds.
+author: 'CRA Compliance OS'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  api-url:
+    description: 'Base URL of your CRA Compliance OS deployment.'
+    required: false
+    default: 'https://api.cracompliance.dev'
+  api-key:
+    description: 'Organisation API key with the `scan` scope. Store it as a repository secret.'
+    required: true
+  repository:
+    description: 'Repository in owner/name form. Defaults to the current repository.'
+    required: false
+    default: ''
+  path:
+    description: 'Subdirectory to scan. Defaults to the repository root.'
+    required: false
+    default: '.'
+  fail-on:
+    description: 'Fail the job when a finding at or above this severity exists. One of: critical, high, medium, low, none.'
+    required: false
+    default: 'critical'
+  fail-on-kev:
+    description: 'Always fail when a CISA KEV (known exploited) vulnerability is present.'
+    required: false
+    default: 'true'
+  min-readiness:
+    description: 'Fail when the CRA readiness score is below this value (0-100). Set to 0 to disable.'
+    required: false
+    default: '0'
+  upload-sbom:
+    description: 'Upload the generated CycloneDX SBOM as a workflow artifact.'
+    required: false
+    default: 'true'
+  comment-pr:
+    description: 'Post a summary comment on pull requests. Requires `pull-requests: write`.'
+    required: false
+    default: 'false'
+  github-token:
+    description: 'Token used to write pull request comments.'
+    required: false
+    default: '${{ github.token }}'
+  timeout:
+    description: 'Seconds to wait for the scan to complete.'
+    required: false
+    default: '240'
+
+outputs:
+  scan-id:
+    description: 'Identifier of the scan.'
+  readiness-score:
+    description: 'CRA readiness score, 0-100.'
+  component-count:
+    description: 'Number of components discovered.'
+  critical-count:
+    description: 'Number of critical findings.'
+  high-count:
+    description: 'Number of high findings.'
+  known-exploited-count:
+    description: 'Number of findings listed in the CISA KEV catalogue.'
+  sbom-url:
+    description: 'URL of the generated SBOM.'
+  dashboard-url:
+    description: 'Link to the scan in the dashboard.'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

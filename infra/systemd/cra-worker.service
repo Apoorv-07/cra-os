@@ -1,0 +1,23 @@
+[Unit]
+Description=CRA Compliance OS worker
+After=network.target cra-api.service
+
+[Service]
+Type=simple
+User=cra
+Group=cra
+WorkingDirectory=/opt/cra/apps/api
+EnvironmentFile=/opt/cra/.env
+ExecStart=/usr/bin/node /opt/cra/apps/api/dist/worker-entry.js
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/cra
+
+[Install]
+WantedBy=multi-user.target

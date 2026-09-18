@@ -1,0 +1,474 @@
+/* ---------------------------------------------------------------------------
+   Marketing design system — "space, not panels".
+
+   The authenticated product stays an engineering instrument: dense, fast,
+   quiet. The public surfaces get a different material language — depth,
+   atmosphere, glass, oversized display type and continuous motion — while
+   keeping exactly the same content, information architecture and copy.
+
+   Everything here is CSS only: no Three.js, no GSAP, no Lenis. Motion is
+   CSS/WAAPI driven and every ambient animation is disabled under
+   prefers-reduced-motion and on low-power devices.
+
+   Motion language
+     FAST       120–240ms   pointer feedback
+     MEDIUM     320–680ms   reveals, state changes
+     CINEMATIC  800–1600ms  section entrances, hero
+     AMBIENT    8–40s       background drift (never attention-seeking)
+--------------------------------------------------------------------------- */
+
+@theme {
+  --font-display:
+    'Inter Tight', 'Inter var', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+
+  /* Spatial type scale — fluid, so the composition holds from 360px to 2560px. */
+  --text-display-1: clamp(2.9rem, 1.4rem + 6.2vw, 6.5rem);
+  --text-display-2: clamp(2.1rem, 1.2rem + 3.6vw, 4rem);
+  --text-display-3: clamp(1.6rem, 1.1rem + 2.1vw, 2.6rem);
+  --text-lead: clamp(1rem, 0.95rem + 0.35vw, 1.2rem);
+
+  /* Atmosphere */
+  --color-void: #05060a;
+  --color-deep: #080a11;
+  --color-iris: #6d8cff;
+  --color-iris-soft: #4a5fd8;
+  --color-violet: #9b7bff;
+  --color-teal: #4fd1c5;
+  --color-amber: #f5b455;
+
+  /* Materials */
+  --glass-bg: rgba(255, 255, 255, 0.035);
+  --glass-bg-strong: rgba(255, 255, 255, 0.06);
+  --glass-line: rgba(255, 255, 255, 0.09);
+  --glass-line-strong: rgba(255, 255, 255, 0.16);
+
+  /* Shadows that read as light, not as borders. */
+  --shadow-lift: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset, 0 24px 60px -28px rgba(0, 0, 0, 0.85);
+  --shadow-float: 0 40px 120px -40px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-glow: 0 0 0 1px rgba(109, 140, 255, 0.25), 0 20px 70px -30px rgba(109, 140, 255, 0.45);
+
+  /* Easings */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --radius-xl: 18px;
+  --radius-2xl: 26px;
+  --radius-3xl: 34px;
+}
+
+/* --------------------------------------------------------------------------
+   Materials
+-------------------------------------------------------------------------- */
+
+@utility glass {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.055) 0%,
+    rgba(255, 255, 255, 0.022) 40%,
+    rgba(255, 255, 255, 0.012) 100%
+  );
+  border: 1px solid var(--glass-line);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(22px) saturate(140%);
+  box-shadow: var(--shadow-lift);
+}
+
+@utility glass-strong {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.085) 0%,
+    rgba(255, 255, 255, 0.035) 45%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  border: 1px solid var(--glass-line-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: blur(30px) saturate(160%);
+  box-shadow: var(--shadow-float);
+}
+
+/* A hairline highlight along the top edge — the "lit from above" cue. */
+@utility sheen-top {
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset-inline: 12%;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+    pointer-events: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Atmosphere — the environment the content floats in
+-------------------------------------------------------------------------- */
+
+@utility aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.5;
+  pointer-events: none;
+  will-change: transform;
+}
+
+@keyframes drift-a {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -4%, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes drift-b {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(-4%, 3%, 0) scale(0.96);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+}
+
+@utility animate-drift-a {
+  animation: drift-a 26s var(--ease-in-out-soft) infinite;
+}
+@utility animate-drift-b {
+  animation: drift-b 34s var(--ease-in-out-soft) infinite;
+}
+
+/* Very fine film grain so large flat gradients never band. */
+@utility grain {
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Typography
+-------------------------------------------------------------------------- */
+
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+/* Gradient ink, used sparingly — one phrase per viewport maximum. */
+@utility ink-gradient {
+  background: linear-gradient(100deg, #ffffff 0%, #c7d4ff 42%, #9b7bff 78%, #6d8cff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility ink-outline {
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.22);
+}
+
+/* --------------------------------------------------------------------------
+   Reveal primitives (driven by IntersectionObserver in motion.tsx)
+-------------------------------------------------------------------------- */
+
+.reveal {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition:
+    opacity 720ms var(--ease-out-expo),
+    transform 900ms var(--ease-out-expo),
+    filter 720ms var(--ease-out-expo);
+  filter: blur(6px);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: transform, opacity;
+}
+.reveal[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* Word-level typographic reveal. */
+.reveal-word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+}
+.reveal-word > span {
+  display: inline-block;
+  transform: translate3d(0, 110%, 0) rotate(2deg);
+  transition: transform 900ms var(--ease-out-expo);
+  transition-delay: var(--word-delay, 0ms);
+}
+[data-visible='true'] .reveal-word > span {
+  transform: none;
+}
+
+/* --------------------------------------------------------------------------
+   Interaction
+-------------------------------------------------------------------------- */
+
+/* Magnetic / proximity elements get a spring settle rather than a hard snap. */
+.magnetic {
+  transition: transform 420ms var(--ease-spring);
+  will-change: transform;
+}
+
+.link-underline {
+  position: relative;
+}
+.link-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  height: 1px;
+  width: 100%;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 460ms var(--ease-out-expo);
+}
+.link-underline:hover::after,
+.link-underline:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* Hover displacement: the object leans toward the pointer. */
+.hoverable {
+  transition:
+    transform 620ms var(--ease-out-quint),
+    box-shadow 620ms var(--ease-out-quint),
+    border-color 400ms ease;
+  will-change: transform;
+}
+.hoverable:hover {
+  box-shadow: var(--shadow-float);
+  border-color: var(--glass-line-strong);
+}
+
+/* A light that sweeps across a surface once on hover. */
+@keyframes sheen-sweep {
+  0% {
+    transform: translateX(-120%) rotate(8deg);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.65;
+  }
+  100% {
+    transform: translateX(140%) rotate(8deg);
+    opacity: 0;
+  }
+}
+.sheen-hover {
+  position: relative;
+  overflow: hidden;
+}
+.sheen-hover::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: 0;
+  width: 45%;
+  height: 220%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.09), transparent);
+  pointer-events: none;
+  opacity: 0;
+}
+.sheen-hover:hover::after {
+  animation: sheen-sweep 1100ms var(--ease-out-quint);
+}
+
+/* Ambient float for hero objects. */
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+@utility animate-float {
+  animation: float-y 9s var(--ease-in-out-soft) infinite;
+}
+@utility animate-float-slow {
+  animation: float-y 16s var(--ease-in-out-soft) infinite;
+}
+
+/* Continuously drawn hairline, used as a section connector. */
+@keyframes trace {
+  0% {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  100% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+.animate-trace {
+  animation: trace 1400ms var(--ease-out-expo) both;
+}
+
+/* Marquee for the ecosystem strip; duplicated content scrolls seamlessly. */
+@keyframes marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+.animate-marquee {
+  animation: marquee 38s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Custom cursor (marketing surfaces only, pointer devices only). */
+.cursor-dot,
+.cursor-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 90;
+  pointer-events: none;
+  border-radius: 9999px;
+  mix-blend-mode: screen;
+}
+.cursor-dot {
+  width: 5px;
+  height: 5px;
+  background: #fff;
+  transform: translate3d(-50%, -50%, 0);
+}
+.cursor-ring {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  display: grid;
+  place-items: center;
+  transition:
+    width 380ms var(--ease-spring),
+    height 380ms var(--ease-spring),
+    background-color 380ms var(--ease-out-expo),
+    border-color 380ms var(--ease-out-expo),
+    opacity 300ms ease;
+}
+.cursor-ring[data-state='active'] {
+  width: 74px;
+  height: 74px;
+  background: rgba(109, 140, 255, 0.16);
+  border-color: rgba(160, 185, 255, 0.65);
+}
+.cursor-ring[data-state='hidden'] {
+  opacity: 0;
+}
+.cursor-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  white-space: nowrap;
+}
+.cursor-ring[data-state='active'] .cursor-label {
+  opacity: 1;
+}
+
+/* The native cursor is hidden only while our cursor is active, and never over
+   text inputs, where precision matters more than atmosphere. */
+body[data-custom-cursor='on'],
+body[data-custom-cursor='on'] a,
+body[data-custom-cursor='on'] button {
+  cursor: none;
+}
+body[data-custom-cursor='on'] input,
+body[data-custom-cursor='on'] textarea,
+body[data-custom-cursor='on'] select {
+  cursor: auto;
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion — the environment stills, the information stays
+-------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  .reveal-word > span {
+    transform: none;
+  }
+  .cursor-dot,
+  .cursor-ring {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Device-aware cost control
+
+   Large blurred fields are the most expensive thing on the page, so they are
+   scaled down on small screens and switched off entirely for visitors who ask
+   for less motion.
+-------------------------------------------------------------------------- */
+
+@media (max-width: 767px) {
+  .aurora {
+    filter: blur(46px);
+    opacity: 0.34;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-strong {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(20, 23, 32, 0.92);
+  }
+}
