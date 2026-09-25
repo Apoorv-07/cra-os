@@ -130,7 +130,3 @@ See §5 of [`docs/TESTING.md`](docs/TESTING.md) for the full list.
 
 ---
 
-## Licence and contact
-
-Set your licence here before publishing. Security reports:
-`security@[your-domain]`.
